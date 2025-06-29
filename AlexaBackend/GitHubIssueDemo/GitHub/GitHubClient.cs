@@ -1,6 +1,7 @@
 ﻿using GitHubIssueDemo.Events;
 using RestSharp;
 using System;
+using System.Threading.Tasks;
 
 namespace GitHubIssueDemo
 {
@@ -41,6 +42,16 @@ namespace GitHubIssueDemo
             restRequest.AddJsonBody(param);
 
             _client.ExecuteAsync(restRequest);
+        }
+
+        public async Task PostIssueCommentAsync(string repoFullName, int issueNumber, string commentBody)
+        {
+            var commentData = new { body = commentBody };
+            
+            RestRequest restRequest = new RestRequest($"repos/{repoFullName}/issues/{issueNumber}/comments", Method.Post);
+            restRequest.AddJsonBody(commentData);
+
+            await _client.ExecuteAsync(restRequest);
         }
 
     }

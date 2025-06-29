@@ -7,6 +7,10 @@ using Alexa.NET.Request;
 using Alexa.NET.Request.Type;
 using Alexa.NET;
 using Alexa.NET.Response;
+using GitHubIssueDemo.Events;
+using GitHubIssueDemo.Services;
+using System.Text.Json;
+using System;
 
 namespace GitHubIssueDemo
 {
@@ -17,6 +21,52 @@ namespace GitHubIssueDemo
         public AlexaDemos(ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<AlexaDemos>();
+        }
+
+        [Function("GitHubIssueWebhook")]
+        public async Task<HttpResponseData> HandleGitHubIssueWebhook(
+            [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+            FunctionContext executionContext)
+        {
+            _logger.LogInformation("GitHub issue webhook triggered");
+
+            try
+            {
+                string json = await req.ReadAsStringAsync();
+                var issueEvent = System.Text.Json.JsonSerializer.Deserialize<GitHubIssueEvent>(json);
+
+                if (issueEvent?.Action == "assigned" && issueEvent.Assignee != null)
+                {
+                    _logger.LogInformation($"Issue #{issueEvent.Issue.Number} assigned to {issueEvent.Assignee.Login}");
+
+                    // Generate Chuck Norris quote
+                    var openAIService = new OpenAIService();
+                    var quote = await openAIService.GenerateChuckNorrisQuoteAsync(issueEvent.Assignee.Login);
+
+                    // Format the comment
+                    var commentBody = $"🥋 **Chuck Norris says:**\n\n> {quote}\n\nGood luck @{issueEvent.Assignee.Login}! 💪 You've got this! 🚀";
+
+                    // Post comment to GitHub
+                    var gitHubClient = new GitHubClient();
+                    await gitHubClient.PostIssueCommentAsync(
+                        issueEvent.Repository.FullName,
+                        issueEvent.Issue.Number,
+                        commentBody);
+
+                    _logger.LogInformation("Chuck Norris greeting posted successfully");
+                }
+
+                var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
+                response.WriteString("Webhook processed successfully");
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing GitHub webhook");
+                var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
+                errorResponse.WriteString("Error processing webhook");
+                return errorResponse;
+            }
         }
 
         [Function("Test")]
